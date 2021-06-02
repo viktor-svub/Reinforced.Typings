@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Reinforced.Typings.Ast.TypeNames;
 using Reinforced.Typings.Attributes;
 using Reinforced.Typings.Exceptions;
@@ -87,6 +88,29 @@ namespace Reinforced.Typings
             return CustomAttributeExtensions.GetCustomAttributes<T>(t.GetTypeInfo(), inherit);
         }
 #endif
+
+        internal static IEnumerable<object> _GetCustomAttributes(this Type t, bool inherit = true)
+        {
+#if NETCORE
+            return t.GetTypeInfo().GetCustomAttributes(inherit);
+#else
+            return t.GetCustomAttributes(inherit);
+#endif
+            
+        }
+
+        public static bool IsReferenceForcedNullable(this MemberInfo member)
+        {
+            byte[] nullableFlag = GetNullableAttributeValue(member);
+            return nullableFlag != null && nullableFlag.Length > 0 && nullableFlag[0] == 2;
+        }
+
+        public static bool IsReferenceForcedNullable(this ParameterInfo member)
+        {
+            byte[] nullableFlag = GetNullableAttributeValue(member);
+            return nullableFlag != null && nullableFlag.Length > 0 && nullableFlag[0] == 2;
+        }
+
         internal static bool _IsGenericType(this Type t)
         {
 #if NETCORE
@@ -154,6 +178,20 @@ namespace Reinforced.Typings
 #else
             return t.IsInterface;
 #endif
+        }
+
+        internal static bool _IsArray(this Type t)
+        {
+#if NETCORE
+            return t.GetTypeInfo().IsArray;
+#else
+            return t.IsArray;
+#endif
+        }
+
+        internal static bool _IsReferenceType(this Type t)
+        {
+            return t._IsClass() || t._IsInterface() || t._IsArray() || typeof(string)._IsAssignableFrom(t);
         }
 
         internal static IEnumerable<Type> _GetInterfaces(this Type t)
@@ -564,6 +602,23 @@ namespace Reinforced.Typings
             return typeof(MulticastDelegate)._IsAssignableFrom(t._BaseType());
         }
 
+        /// <summary>
+        /// Determines if type is one of System.Tuple types set
+        /// </summary>
+        /// <param name="t">Type to check</param>
+        /// <returns>True when type is tuple, false otherwise</returns>
+        public static bool _IsAsyncType(this Type t)
+        {
+            return t._IsAssignableFrom(typeof(Task)) || (
+                t._IsGenericType()
+                && t._BaseType() != null
+                && t._BaseType()._IsAssignableFrom(typeof(Task))
+
+                // exclude "object" as "Task" is assignable to it, too
+                && !t._BaseType()._IsAssignableFrom(typeof(Object))
+            );
+        }
+
 #endregion
 
 #region Modifiers
@@ -590,6 +645,17 @@ namespace Reinforced.Typings
             if (methodInfo.IsPrivate) return AccessModifier.Private;
             if (methodInfo.IsFamily) return AccessModifier.Protected;
             return AccessModifier.Public;
+        }
+
+        /// <summary>
+        ///     Returns access modifier for specified method
+        /// </summary>
+        /// <param name="methodInfo">Method</param>
+        /// <returns>Access modifier string</returns>
+        public static bool IsAsync(this MethodInfo methodInfo)
+        {
+            var ret = methodInfo.ReturnType;
+            return ret._IsAsyncType();
         }
 
         /// <summary>
@@ -761,7 +827,89 @@ namespace Reinforced.Typings
 
 #endregion
 
+        /// <summary>
+        /// Reads the new compiler specific nullable attribute of the parameter or its parent scopes.
+        /// </summary>
+        /// <param name="member">The parameter to check for the availability of a nullable attribute.</param>
+        /// <returns>the value of the first attribute to find or <c>null</c> if none is available.</returns>
+        public static byte[] GetNullableAttributeValue(this ParameterInfo member)
+        {
+            // non reference types will be converted to Nullable<> if they are nullable.
+            // C# 8.0 nullable flag just changes the way reference types are handled. If enabled, then they are
+            // not implicitly nullable anymore!
+            if (member?.ParameterType == null || !member.ParameterType._IsReferenceType())
+            {
+                return null;
+            }
+
+            return GetNullableAttributeValue(member.GetCustomAttributes(), false) ??
+                   GetNullableAttributeValue(member.Member.GetCustomAttributes(), true) ??
+                   GetNullableAttributeValue(member.Member.DeclaringType._GetCustomAttributes(true), true);
+        }
 
 
+        /// <summary>
+        /// Reads the new compiler specific nullable attribute of a property or field or their parent scopes.
+        /// </summary>
+        /// <param name="member">The property or field to check for the availability of a nullable attribute.</param>
+        /// <returns>the value of the first attribute to find or <c>null</c> if none is available.</returns>
+        public static byte[] GetNullableAttributeValue(this MemberInfo member)
+        {
+            Type memberType = member is PropertyInfo propertyInfo ? propertyInfo.PropertyType : (
+                member is FieldInfo fieldInfo ? fieldInfo.FieldType : null
+            );
+
+            if (memberType == null || !memberType._IsReferenceType())
+            {
+                return null;
+            }
+
+            return GetNullableAttributeValue(member.GetCustomAttributes(true), false) 
+                   ?? GetNullableAttributeValue(member.DeclaringType._GetCustomAttributes(true), true);
+        }
+
+        private static byte[] GetNullableAttributeValue(IEnumerable<object> attributes, bool fromParent)
+        {
+            if (attributes == null) return null;
+
+            // need to retrieve all attributes and find by class name.
+            // see: http://code.fitness/post/2019/02/nullableattribute.html
+            // https://github.com/dotnet/roslyn/blob/master/docs/features/nullable-metadata.md
+            foreach(var customAttribute in attributes)
+            {
+                if (customAttribute is Attribute nullableAttribute) 
+                {
+                    bool isNullableAttribute = string.Equals(
+                        customAttribute.GetType().FullName, 
+                        "System.Runtime.CompilerServices.NullableAttribute",
+                        StringComparison.OrdinalIgnoreCase
+                    ); 
+
+                    bool isNullableContextAttribute = fromParent && !isNullableAttribute && string.Equals(
+                       customAttribute.GetType().FullName, 
+                       "System.Runtime.CompilerServices.NullableContextAttribute",
+                       StringComparison.OrdinalIgnoreCase
+                    );
+
+                    if (!isNullableAttribute && !isNullableContextAttribute)
+                    {
+                        continue;
+                    }
+
+                    FieldInfo flagField = isNullableAttribute
+                        ? nullableAttribute.GetType().GetRuntimeField("NullableFlags")
+                        : nullableAttribute.GetType().GetRuntimeField("Flag");
+                        
+                    object flagsData = flagField?.GetValue(nullableAttribute);
+                    byte[] flags = flagsData is byte[] flagsDataBytes ? flagsDataBytes : null;
+                    flags = flags is null && flagsData is byte flagsDataSingleByte ?
+                        new byte[] {flagsDataSingleByte} : flags;
+
+                    return flags != null && flags.Length > 0 ? flags : null;
+                }
+            }
+
+            return null;
+        }
     }
 }

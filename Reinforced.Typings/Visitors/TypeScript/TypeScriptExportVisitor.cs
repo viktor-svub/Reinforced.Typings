@@ -14,9 +14,6 @@ namespace Reinforced.Typings.Visitors.TypeScript
     public partial class TypeScriptExportVisitor : TextExportingVisitor
     {
         protected WriterContext Context { get; set; }
-
-        
-
         
 
         /// <summary>
@@ -85,8 +82,24 @@ namespace Reinforced.Typings.Visitors.TypeScript
         /// Writes empty method body of known return type
         /// </summary>
         /// <param name="returnType">Method return type</param>
-        protected void EmptyBody(RtTypeName returnType)
+        /// <param name="isAsyncMethod">Whether the method is tagged as "async", then no Promise need to be created
+        /// directly. TypeScript compiler does it for us.</param>
+        protected void EmptyBody(RtTypeName returnType, bool isAsyncMethod = false)
         {
+            // unfold the Promise return value
+            if (returnType is RtAsyncType)
+            {
+                if (isAsyncMethod)
+                {
+                    returnType = ((RtAsyncType) returnType).TypeNameOfAsync;
+                }
+                else
+                {
+                    CodeBlock("return Promise.resolve(null);");
+                    return;
+                }
+            }
+
             if (returnType == null || returnType.IsVoid())
             {
                 WriteLine(" { } ");
@@ -159,7 +172,7 @@ namespace Reinforced.Typings.Visitors.TypeScript
         {
             if (n is RtConstructor) return true;
             if (n is RtField) return true;
-            if (n is RtFuncion) return true;
+            if (n is RtFunction) return true;
             return false;
         }
 
@@ -167,7 +180,7 @@ namespace Reinforced.Typings.Visitors.TypeScript
         {
             var constructors = nodes.Where(d => d is RtConstructor).OfType<RtConstructor>();
             var fields = nodes.Where(d => d is RtField).OfType<RtField>().OrderBy(d => d.Identifier.IdentifierName);
-            var methods = nodes.Where(d => d is RtFuncion).OfType<RtFuncion>().OrderBy(d => d.Identifier.IdentifierName);
+            var methods = nodes.Where(d => d is RtFunction).OfType<RtFunction>().OrderBy(d => d.Identifier.IdentifierName);
             var rest = nodes.Where(d => !IsKnownMember(d));
 
             return constructors.Cast<RtNode>()

@@ -12,7 +12,7 @@ namespace Reinforced.Typings.Visitors
             if (node == null) return;
             if (node is RtField) { Visit((RtField)node); return; }
             if (node is RtInterface) { Visit((RtInterface)node); return; }
-            if (node is RtFuncion) { Visit((RtFuncion)node); return; }
+            if (node is RtFunction) { Visit((RtFunction)node); return; }
             if (node is RtArgument) { Visit((RtArgument)node); return; }
             if (node is RtClass) { Visit((RtClass)node); return; }
             if (node is RtIdentifier) { Visit((RtIdentifier)node); return; }
@@ -30,13 +30,14 @@ namespace Reinforced.Typings.Visitors
             if (node is RtDecorator) { Visit((RtDecorator)node); return; }
             if (node is RtReference) { Visit((RtReference)node); return; }
             if (node is RtTuple) { Visit((RtTuple)node); return; }
+            if (node is RtAsyncType) { Visit((RtAsyncType)node); return; }
 
             throw new Exception("Unknown node passed");
         }
 
         public abstract void Visit(RtField node);
         public abstract void Visit(RtInterface node);
-        public abstract void Visit(RtFuncion node);
+        public abstract void Visit(RtFunction node);
         public abstract void Visit(RtArgument node);
         public abstract void Visit(RtClass node);
         public abstract void Visit(RtIdentifier node);
@@ -54,6 +55,7 @@ namespace Reinforced.Typings.Visitors
         public abstract void Visit(RtDecorator node);
         public abstract void Visit(RtReference node);
         public abstract void Visit(RtTuple node);
+        public abstract void Visit(RtAsyncType node);
         public abstract void VisitFile(ExportedFile file);
     }
 }

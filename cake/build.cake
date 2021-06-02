@@ -1,6 +1,6 @@
 #addin "Cake.FileHelpers"
 var target = Argument("target", "Build");
-const string version = "1.5.5";
+const string version = "1.5.9";
 
 Task("Clean")
   .Does(() =>
@@ -32,13 +32,14 @@ const string NETCORE11 = "netcoreapp1.1";
 const string NET461 = "net461";
 const string NET46 = "net46";
 const string NET45 = "net45";
+const string NET50 = "net5.0";
 
-var cliFrameworks = new[] { NETCORE10, NETCORE11, NET45, NET461,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31}; 
-var rtFrameworks = new[]  { NETCORE10, NETCORE11, NETSTANDARD15,NETSTANDARD20,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31,NET45, NET461};
+var cliFrameworks = new[] { NETCORE10, NETCORE11, NET45, NET461,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31, NET50}; 
+var rtFrameworks = new[]  { NETCORE10, NETCORE11, NETSTANDARD15,NETSTANDARD20,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31,NET45, NET461, NET50};
 var taskFrameworks = new[] { NET46, NETSTANDARD20};
 
-var netCore = new HashSet<string>(new[]{NETSTANDARD15,NETSTANDARD20,NETCORE10,NETCORE11,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31});
-var netCoreApp = new HashSet<string>(new[]{NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31});
+var netCore = new HashSet<string>(new[]{NETSTANDARD15,NETSTANDARD20,NETCORE10,NETCORE11,NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31,NET50});
+var netCoreApp = new HashSet<string>(new[]{NETCORE20,NETCORE21,NETCORE22,NETCORE30,NETCORE31,NET50});
 
 const string CliNetCoreProject = "../Reinforced.Typings.Cli/Reinforced.Typings.Cli.NETCore.csproj";
 const string RtNetCoreProject = "../Reinforced.Typings/Reinforced.Typings.NETCore.csproj";
@@ -47,6 +48,18 @@ const string tfParameter = "TargetFrameworks";
 string tfRgx = $"<{tfParameter}>[a-zA-Z0-9;.]*</{tfParameter}>"; 
 const string tfSingleParameter = "TargetFramework";
 string tfsRgx = $"<{tfSingleParameter}>[a-zA-Z0-9;.]*</{tfSingleParameter}>"; 
+
+Task("Reset")
+  .IsDependentOn("UpdateVersions")
+  .Description("Resets target frameworks")
+  .Does(() =>
+{
+	var fw = NET461;
+	ReplaceRegexInFiles(CliNetCoreProject,tfRgx,$"<{tfParameter}>{fw}</{tfParameter}>");       
+    ReplaceRegexInFiles(RtNetCoreProject,tfRgx,$"<{tfParameter}>{fw}</{tfParameter}>"); 
+    ReplaceRegexInFiles(CliNetCoreProject,tfsRgx,$"<{tfSingleParameter}>{fw}</{tfSingleParameter}>");       
+    ReplaceRegexInFiles(RtNetCoreProject,tfsRgx,$"<{tfSingleParameter}>{fw}</{tfSingleParameter}>"); 
+});
 
 Task("PackageClean")
   .Description("Cleaning temporary package folder")
@@ -91,7 +104,7 @@ Task("BuildIntegrate")
       Verbosity = DotNetCoreVerbosity.Quiet,
       Configuration = RELEASE,	  
       MSBuildSettings = mbs,
-      OutputDirectory = System.IO.Path.Combine(buildPath, fw),
+      OutputDirectory = System.IO.Path.Combine(buildPath, fw),      
       Framework = fw
     });    
     
@@ -183,6 +196,7 @@ Task("Build")
 
   // Copy readme with actual version of Reinforced.Typings.settings.xml
   CopyFileToDirectory("../stuff/readme.txt", packageRoot);
+  CopyFileToDirectory("../icon.png", packageRoot);
   using(var tr = System.IO.File.OpenRead("../stuff/Reinforced.Typings.settings.xml"))
   using(var tw = new System.IO.FileStream(System.IO.Path.Combine(packageRoot,"readme.txt"),FileMode.Append))
   {
@@ -204,11 +218,19 @@ Task("Build")
 
   Information("---------");
   Information("Packaging");
-  Information("---------");
-  NuGetPack("../package/Reinforced.Typings.nuspec", new NuGetPackSettings {
-    BasePath = "../package",
-    OutputDirectory = "../"
-  });
+  Information("---------");  
+
+  var nugetSettings = new ProcessSettings
+    {     
+      Arguments = "pack ../package/Reinforced.Typings.nuspec -OutputDirectory \"../\"" 
+    };
+
+  using(var process = StartAndReturnProcess("nuget", nugetSettings))
+  {
+      process.WaitForExit();      
+  }
+
+  
 
   Information("Build complete");
 });

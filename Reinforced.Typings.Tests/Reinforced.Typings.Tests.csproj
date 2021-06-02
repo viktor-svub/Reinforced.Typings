@@ -35,6 +35,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -75,6 +76,7 @@
     <Compile Include="SpecificCases\SpecificTestCases.GenericsExport2.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.GenericsExport.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.HierarchyFlattening4.cs" />
+    <Compile Include="SpecificCases\SpecificTestCases.InheritDoc.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.InvalidFlattenOrder.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.HierarchyFlattening3.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.HierarchyFlattening2.cs" />
@@ -111,6 +113,8 @@
     <Compile Include="SpecificCases\SpecificTestCases.DtsNoDeclareEnumWithoutAmbientScope.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.KpKozakIssueWithInheritance.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.NvirthMultilineString.cs" />
+    <Compile Include="SpecificCases\SpecificTestCases.AutoAsync.cs" />
+    <Compile Include="SpecificCases\SpecificTestCases.ADIXReadonlyDictionaryWorkaround.cs" />
     <Compile Include="SpecificCases\SpecificTestCases._CopyMe_.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.JonsaEnumWithouNamespaceTest.cs" />
     <Compile Include="SpecificCases\SpecificTestCases.PandaWoodCamelCase.cs" />

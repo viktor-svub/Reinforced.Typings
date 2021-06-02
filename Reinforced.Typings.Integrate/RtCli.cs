@@ -145,6 +145,7 @@ namespace Reinforced.Typings.Integrate
 
             if (TargetFramework.StartsWith("net46")) return "net461";
             if (TargetFramework.StartsWith("net47")) return "net461";
+            if (TargetFramework.StartsWith("net48")) return "net461";
             return TargetFramework;
         }
 
@@ -156,6 +157,7 @@ namespace Reinforced.Typings.Integrate
                 if (string.IsNullOrEmpty(fw)) return false;
                 if (fw.StartsWith("netstandard")) return true;
                 if (fw.StartsWith("netcoreapp")) return true;
+                if (fw.StartsWith("net5")) return true;
                 return false;
             }
         }
